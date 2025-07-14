@@ -24,5 +24,7 @@ int main() {
     wm.findCrossSection();
     wm.showIn();
     wm.showOut();
+    // wm.findFinal();
+    wm.showFinal();
     return 0;
 }

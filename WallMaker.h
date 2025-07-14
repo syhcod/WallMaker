@@ -16,6 +16,8 @@ public:
     unsigned int getNum() const;
     unsigned int getNs(int n) const;
     void findCrossSection();
+    void findFinal();
+    void showFinal();
 private:
     struct torPoint {
         torPoint* next = nullptr;

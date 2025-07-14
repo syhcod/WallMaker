@@ -5,6 +5,7 @@
 #include <fstream>
 #include <sstream>
 #include <string>
+#include <algorithm>
 
 const float THICKNESS = 1.0f;
 
@@ -184,6 +185,7 @@ void WallMaker::findCrossSection() {
     for (int i = 0; i < num; i++) {
         torPoint* Rot = OArray[i];
         do {
+            bool didIntersect = false;
             for (int k = i + 1; k < num; k++) {
                 torPoint* iRot = OArray[k];
                 do {
@@ -193,7 +195,7 @@ void WallMaker::findCrossSection() {
                     FPoint p4 = iRot->next->p;
                     FPoint* intersection = isCollision(p1, p2, p3, p4);
                     if (intersection != nullptr) {
-                        printf("Collision!\n");
+                        // printf("Collision!\n");
                         FPoint inter = *intersection;
                         torPoint* tp1 = createCrossSection(inter, Rot->next);
                         torPoint* tp2 = createCrossSection(inter, iRot->next);
@@ -208,12 +210,15 @@ void WallMaker::findCrossSection() {
                                 exit(1);
                             }
                         }
+                        didIntersect = true;
                         intersections.push_back(tp1);
-                        iRot = skipInter(iRot);
+                        iRot = iRot->next;
                     }
+                    iRot = iRot->next;
                 } while (iRot != OArray[k]);
             }
-            Rot = skipInter(Rot);
+            if (didIntersect) Rot = Rot->next;
+            Rot = Rot->next;
         } while (Rot != OArray[i]);
     }
 }
@@ -241,7 +246,7 @@ FPoint* WallMaker::isCollision(FPoint p1, FPoint p2, FPoint p3, FPoint p4) {
     }
     float t=((yi-b)*(xf-xi)-(xi-a)*(yf-yi))/det;
     float s=((yi-b)*(c-a)-(xi-a)*(d-b))/det;
-    
+    /*
     if (xi > 30 && xi < 35) {
         printf("LAKAKLDS\n");
         printf("L((%.2f, %.2f),(%.2f, %.2f))\n", p1.x, p1.y, p2.x - p1.x, p2.y - p1.y);
@@ -253,6 +258,7 @@ FPoint* WallMaker::isCollision(FPoint p1, FPoint p2, FPoint p3, FPoint p4) {
         printf("L((%.2f, %.2f),(%.2f, %.2f))\n", p1.x, p1.y, p2.x - p1.x, p2.y - p1.y);
         printf("L((%.2f, %.2f),(%.2f, %.2f))\n", p3.x, p3.y, p4.x - p3.x, p4.y - p3.y);
     }
+    */
     if (0<=s && s<=1) {
         // printf("\tGOne\n");
         float x = xi + (xf - xi) * s;
@@ -292,7 +298,9 @@ void WallMaker::showOut() {
 WallMaker::torPoint* WallMaker::skipInter(WallMaker::torPoint* tp) {
     torPoint* tap = tp;
     FPoint inter;
-    while (true) {
+    bool flag = true;
+    while (flag) {
+        flag = false;
         tap = tap->next;
         inter = tap->p;
         if (tap == tp) {
@@ -301,10 +309,50 @@ WallMaker::torPoint* WallMaker::skipInter(WallMaker::torPoint* tp) {
         }
         for(auto ittt : intersections) {
             if (ittt->p == inter) { // Means still Intersect point
-                continue;
+                flag = true;
+                break;
             }
         }
-        break;
     }
     return tap;
+}
+
+void WallMaker::findFinal() {
+    auto cpy = intersections;
+    for(auto& it : intersections) {
+        if (it == nullptr) continue;
+        torPoint* tp = it->next;
+        while (tp != it) {
+            bool falg = true;
+            for (auto itt : cpy) {
+                if (itt->p == tp->next->p) {
+                    falg = true;
+                    break;
+                }
+            }
+            if (falg) {
+                WallMaker::torPoint* tap = new WallMaker::torPoint;
+                tap->p = tp->next->p;
+                tap->next = tp->next->next;
+                tp->next = tap;
+                auto iter = std::find(intersections.begin(), intersections.end(), it);
+                while (++iter != intersections.end()) {
+                    if ((*iter)->p == tap->p) *iter = nullptr;
+                }
+                tp = tap;
+            } else {
+
+            }
+
+            tp = tp->next;
+        }
+        it = tp;
+    }
+}
+
+void WallMaker::showFinal() {
+    for (auto& it : intersections) {
+        if (it == nullptr) continue;
+        showTorPoints(it);
+    }
 }
