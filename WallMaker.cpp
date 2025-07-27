@@ -7,7 +7,7 @@
 #include <string>
 #include <algorithm>
 
-const float THICKNESS = 1.0f;
+const float THICKNESS = 0.5f;
 
 WallMaker::WallMaker(const char* dotsfile) {
     std::ifstream dotF(dotsfile);
@@ -18,7 +18,14 @@ WallMaker::WallMaker(const char* dotsfile) {
     ns = (unsigned int*)malloc(sizeof(int) * num);
     IArray = (torPoint**)malloc(sizeof(torPoint*) * num);
     OArray = (torPoint**)malloc(sizeof(torPoint*) * num);
+    isCol = (bool*)malloc(sizeof(bool) * num);
+    isnCol = (bool*)malloc(sizeof(bool) * num);
+    for (int i = 0; i < num; i++) {
+        isCol[i] = false;
+        isnCol[i] = false;
+    }
     int nu = 0;
+    
     while(std::getline(dotF, line)) {
         std::istringstream in(line);      //make a stream for the line itself
 
@@ -26,19 +33,23 @@ WallMaker::WallMaker(const char* dotsfile) {
         in >> len;
         ns[nu] = len;
         task[nu] = (FPoint*)malloc(sizeof(FPoint) * len);
+        FPoint buff;
         for (unsigned int i = 0; i < len; i++) {
             float a, b;
             in >> a;
             in >> b;
             task[nu][i] = FPoint(a, b);
+            
+            // if (i != 0)
+            //     printf("L((%.2f, %.2f),(%.2f, %.2f))\n", buff.x, buff.y, task[nu][i].x - buff.x, task[nu][i].y - buff.y);
+            // buff = FPoint(a,b);
         }
+        // printf("L((%.2f, %.2f),(%.2f, %.2f))\n", task[nu][0].x, task[nu][0].y, buff.x - task[nu][0].x, buff.y - task[nu][0].y);
         if (++nu >= num) break;
     } 
     for (int i = 0; i < num; i++) {
-        // printf("예아(%d))\n", i);
         IArray[i] = makeInner(task[i], ns[i]);
         OArray[i] = makeOuter(task[i], ns[i]);
-        // printf("예아(%d)\n", i);
     }
 }
 
@@ -55,16 +66,16 @@ unsigned int WallMaker::getNs(int n) const {
     else return 0;
 }
 
-WallMaker::torPoint* WallMaker::makeInner(FPoint* tor, int num) {
+torPoint* WallMaker::makeInner(FPoint* tor, int num) {
     torPoint* buffer = nullptr;
     torPoint* first = nullptr;
     // printf("(%d)\n", num);
-    for (int i = 0; i < num - 2; i++) {
-        FPoint p1 = tor[i];
-        FPoint p2 = tor[i + 1];
-        FPoint p3 = tor[i + 2];
+    for (int i = num - 1; i >= 2; i--) {
+        FPoint p3 = tor[i];
+        FPoint p2 = tor[i - 1];
+        FPoint p1 = tor[i - 2];
         torPoint* tp = new torPoint();
-        if (i==0) first = tp;
+        if (i==num - 1) first = tp;
         else tp->next = buffer;
         buffer = tp;
         tp->p = getIPoint(p1, p2, p3);
@@ -72,16 +83,16 @@ WallMaker::torPoint* WallMaker::makeInner(FPoint* tor, int num) {
     torPoint* tp = new torPoint();
     tp->next = buffer;
     buffer = tp;
-    tp->p = getIPoint(tor[num - 2], tor[num - 1], tor[0]);
+    tp->p = getIPoint(tor[num - 1], tor[0], tor[1]);
     tp = nullptr;
     tp = new torPoint();
     tp->next = buffer;
-    tp->p = getIPoint(tor[num - 1], tor[0], tor[1]);
+    tp->p = getIPoint(tor[num-2], tor[num - 1], tor[0]);
     first->next = tp;
     return first;
 }
 
-WallMaker::torPoint* WallMaker::makeOuter(FPoint* tor, int num) {
+torPoint* WallMaker::makeOuter(FPoint* tor, int num) {
     torPoint* buffer = nullptr;
     torPoint* first = nullptr;
     for (int i = 0; i < num - 2; i++) {
@@ -179,11 +190,12 @@ FPoint* WallMaker::getOut(int i) {
 }
 
 #endif
-
+/*
 void WallMaker::findCrossSection() {
     unsigned int CSNum = 0;
     for (int i = 0; i < num; i++) {
         torPoint* Rot = OArray[i];
+        bool didColl = false;
         do {
             bool didIntersect = false;
             for (int k = i + 1; k < num; k++) {
@@ -195,6 +207,7 @@ void WallMaker::findCrossSection() {
                     FPoint p4 = iRot->next->p;
                     FPoint* intersection = isCollision(p1, p2, p3, p4);
                     if (intersection != nullptr) {
+                        didColl = true;
                         // printf("Collision!\n");
                         FPoint inter = *intersection;
                         torPoint* tp1 = createCrossSection(inter, Rot->next);
@@ -213,6 +226,43 @@ void WallMaker::findCrossSection() {
                         didIntersect = true;
                         intersections.push_back(tp1);
                         iRot = iRot->next;
+
+                        isCol[i] = didColl;
+                        isCol[k] = didColl;
+                    }
+                    iRot = iRot->next;
+                } while (iRot != OArray[k]);
+            }
+            if (didIntersect) Rot = Rot->next;
+            Rot = Rot->next;
+        } while (Rot != OArray[i]);
+        do {
+            bool didIntersect = true;
+            for (int k = 0; k < num; k++) {
+                torPoint* iRot = IArray[k];
+                do {
+                    FPoint p1 = Rot->p;
+                    FPoint p2 = Rot->next->p;
+                    FPoint p3 = iRot->p;
+                    FPoint p4 = iRot->next->p;
+                    FPoint* intersection = isCollision(p1, p2, p3, p4);
+                    if (intersection != nullptr) {
+                        didColl = true;
+                        // printf("Collision!\n");
+                        FPoint inter = *intersection;
+                        torPoint* tp1 = createCrossSection(inter, Rot->next);
+                        torPoint* tp2 = createCrossSection(inter, iRot->next);
+                        Rot->next = tp1;
+                        iRot->next = tp2;
+                        tp1->intersect = tp2;
+                        tp2->intersect = tp1;
+                        
+                        didIntersect = true;
+                        intersections.push_back(tp1);
+                        iRot = iRot->next;
+
+                        isCol[i] = didColl;
+                        isCol[k] = didColl;
                     }
                     iRot = iRot->next;
                 } while (iRot != OArray[k]);
@@ -222,8 +272,144 @@ void WallMaker::findCrossSection() {
         } while (Rot != OArray[i]);
     }
 }
+*/
 
-WallMaker::torPoint* WallMaker::createCrossSection(FPoint coord, WallMaker::torPoint* next) {
+bool WallMaker::arePointsSimilar(FPoint p1, FPoint p2) {
+    float x = p1.x - p2.x;
+    float y = p1.y - p2.y;
+    // printf("%f\n", sqrt(x * x + y * y));
+    return sqrt(x * x + y * y) < 0.001f;
+}
+
+void WallMaker::checkValidInner() {
+    for (int i = 0; i < num; i++) {
+        bool flag = false;
+        torPoint* inner = IArray[i];
+        if (isClockwise(inner) < 0) {
+            IArray[i] = nullptr;
+            continue;
+        }
+        torPoint* i1 = inner;
+        torPoint* i2 = inner->next->next;
+        do {
+            do {
+                FPoint* inter = isCollision(i1->p, i1->next->p, i2->p, i2->next->p);
+                if (inter != nullptr) {
+                    FPoint fp = *inter;
+                    bool valid = arePointsSimilar(i1->p, fp) || arePointsSimilar(i1->next->p, fp);
+                    valid = valid || arePointsSimilar(i2->p, fp) || arePointsSimilar(i2->next->p, fp);
+                    
+                    if (valid) {
+                        i2 = i2->next;
+                        continue;
+                    }
+                    IArray[i] = nullptr;
+                    flag = true;
+                    break;
+                }
+                i2 = i2->next;
+            } while (i2->next != i1);
+            i1 = i1->next;
+            i2 = i1->next;
+        } while (i1 != inner && !flag);
+    }
+}
+
+void WallMaker::findCrossSection() {
+    checkValidInner();
+    for (int i = 0; i < num; i++) {
+        torPoint* outer1 = OArray[i];
+        for (int j = i + 1; j < num; j++) {
+            torPoint* outer2 = OArray[j];
+            do {
+                do {
+                    FPoint* inter = isCollision(outer1->p, outer1->next->p, outer2->p, outer2->next->p);
+                    if (inter != nullptr) {
+                        if (isIntersect(*inter)) {
+                            FPoint inta = *inter;
+                            bool valid = arePointsSimilar(outer1->p, inta) || arePointsSimilar(outer1->next->p, inta);
+                            valid = valid || arePointsSimilar(outer2->p, inta) || arePointsSimilar(outer2->next->p, inta);
+                            if (valid) {
+                                outer2 = outer2->next;
+                                continue;
+                            } else {
+                                printf("ERROR: Multiple of the same intersection\n");
+                                printf("Please check (%.2f, %.2f)", inta.x, inta.y);
+                                exit(1);
+                            }
+                        }
+                        isCol[i] = true;
+                        isCol[j] = true;
+                        torPoint* neext1 = createCrossSection(*inter, outer1->next);
+                        torPoint* neext2 = createCrossSection(*inter, outer2->next);
+                        outer1->next = neext1;
+                        outer2->next = neext2;
+                        neext1->intersect = neext2;
+                        neext2->intersect = neext1;
+                        // outer1 = neext1;
+                        outer2 = neext2;
+                        isCol[i] = true;
+                        isCol[j] = true;
+                        intersections.push_back(neext1);
+                    }
+                    outer2 = outer2->next;
+                } while (outer2 != OArray[j]);
+                outer1 = outer1->next;
+            } while (outer1 != OArray[i]);
+        }
+        for (int j = 0; j < num; j++) {
+            if (j == i || IArray[j] == nullptr) continue;
+            torPoint* inner = IArray[j];
+            do {
+                do {
+                    FPoint* inter = isCollision(outer1->p, outer1->next->p, inner->p, inner->next->p);
+                    if (inter != nullptr) {
+                        if (isIntersect(*inter)) {
+                            FPoint inta = *inter;
+                            bool valid = arePointsSimilar(outer1->p, inta) || arePointsSimilar(outer1->next->p, inta);
+                            valid = valid || arePointsSimilar(inner->p, inta) || arePointsSimilar(inner->next->p, inta);
+                            if (valid) {
+                                inner = inner->next;
+                                continue;
+                            } else {
+                                printf("ERROR: Multiple of the same intersection\n");
+                                printf("Please check (%.2f, %.2f)", inta.x, inta.y);
+                                exit(1);
+                            }
+                        }
+                        isnCol[j] = true;
+                        torPoint* neext1 = createCrossSection(*inter, outer1->next);
+                        torPoint* neext2 = createCrossSection(*inter, inner->next);
+                        outer1->next = neext1;
+                        inner->next = neext2;
+                        neext1->intersect = neext2;
+                        neext2->intersect = neext1;
+                        // outer1 = neext1;
+
+                        inner = neext2;
+                        isCol[i] = true;
+                        isCol[j] = true;
+
+                        intersections.push_back(neext1);
+                    }
+                    inner = inner->next;
+                } while (inner != IArray[j]);
+                outer1 = outer1->next;
+            } while (outer1 != OArray[i]);
+        }
+    }
+}
+
+bool WallMaker::isIntersect(FPoint p) {
+    for(auto ittt : intersections) {
+        if (ittt->p == p) {
+            return true;
+        }
+    }
+    return false;
+}
+
+torPoint* WallMaker::createCrossSection(FPoint coord, torPoint* next) {
     torPoint* tp = new torPoint();
     tp->p = coord;
     tp->next = next;
@@ -246,19 +432,6 @@ FPoint* WallMaker::isCollision(FPoint p1, FPoint p2, FPoint p3, FPoint p4) {
     }
     float t=((yi-b)*(xf-xi)-(xi-a)*(yf-yi))/det;
     float s=((yi-b)*(c-a)-(xi-a)*(d-b))/det;
-    /*
-    if (xi > 30 && xi < 35) {
-        printf("LAKAKLDS\n");
-        printf("L((%.2f, %.2f),(%.2f, %.2f))\n", p1.x, p1.y, p2.x - p1.x, p2.y - p1.y);
-        printf("L((%.2f, %.2f),(%.2f, %.2f))\n", p3.x, p3.y, p4.x - p3.x, p4.y - p3.y);
-    }
-
-    if (xf > 30 && xf < 35) {
-        printf("ijfsd\n");
-        printf("L((%.2f, %.2f),(%.2f, %.2f))\n", p1.x, p1.y, p2.x - p1.x, p2.y - p1.y);
-        printf("L((%.2f, %.2f),(%.2f, %.2f))\n", p3.x, p3.y, p4.x - p3.x, p4.y - p3.y);
-    }
-    */
     if (0<=s && s<=1) {
         // printf("\tGOne\n");
         float x = xi + (xf - xi) * s;
@@ -274,6 +447,7 @@ FPoint* WallMaker::isCollision(FPoint p1, FPoint p2, FPoint p3, FPoint p4) {
 }
 
 void WallMaker::showTorPoints(torPoint* tp) {
+    if (tp == nullptr) return;
     torPoint* iter = tp;
     do {
         FPoint p1 = iter->p;
@@ -295,7 +469,7 @@ void WallMaker::showOut() {
     }
 }
 
-WallMaker::torPoint* WallMaker::skipInter(WallMaker::torPoint* tp) {
+torPoint* WallMaker::skipInter(torPoint* tp) {
     torPoint* tap = tp;
     FPoint inter;
     bool flag = true;
@@ -317,42 +491,126 @@ WallMaker::torPoint* WallMaker::skipInter(WallMaker::torPoint* tp) {
     return tap;
 }
 
-void WallMaker::findFinal() {
-    auto cpy = intersections;
-    for(auto& it : intersections) {
-        if (it == nullptr) continue;
-        torPoint* tp = it->next;
-        while (tp != it) {
-            bool falg = true;
-            for (auto itt : cpy) {
-                if (itt->p == tp->next->p) {
-                    falg = true;
-                    break;
-                }
-            }
-            if (falg) {
-                WallMaker::torPoint* tap = new WallMaker::torPoint;
-                tap->p = tp->next->p;
-                tap->next = tp->next->next;
-                tp->next = tap;
-                auto iter = std::find(intersections.begin(), intersections.end(), it);
-                while (++iter != intersections.end()) {
-                    if ((*iter)->p == tap->p) *iter = nullptr;
-                }
-                tp = tap;
-            } else {
-
-            }
-
-            tp = tp->next;
+torPoint* WallMaker::skipToInter(torPoint* tp) {
+    torPoint* tap = tp;
+    FPoint inter;
+    for(auto ittt : intersections) {
+        if (ittt->p == tp->p) { // Means still Intersect point
+            return tp;
         }
-        it = tp;
+    }
+
+    bool flag = true;
+    while (flag) {
+        tap = tap->next;
+        inter = tap->p;
+        if (tap == tp) {
+            printf("ERROR: Every point is intersection!\n");
+            exit(1);
+        }
+        for(auto ittt : intersections) {
+            if (ittt->p == inter) { // Means still Intersect point
+                flag = false;
+                break;
+            }
+        }
+    }
+    return tap;
+}
+
+void WallMaker::findFinal() {
+    torPoint* cur = nullptr;
+    for (int i = 0; i < num; i++) {
+        if (!isCol[i]) {
+            if (theOne == nullptr) {
+                theOne = OArray[i];
+                cur = theOne;
+            }
+            else {
+                cur->intersect = OArray[i];
+                cur = cur->intersect;
+            }
+        }
+    }
+    for (int i = 0; i < num; i++) {
+        if (IArray[i] == nullptr) continue;
+        if (!isnCol[i]) {
+            if (theOne == nullptr) {
+                theOne = IArray[i];
+                cur = theOne;
+            } else {
+                cur->intersect = IArray[i];
+                cur = cur->intersect;
+            }
+        }
+    }
+    int p = 0;
+    for (torPoint* it : intersections) {
+        // printf("NOT %d\n", p++);
+        if (it == nullptr) continue;
+        torPoint* trep = createLoop(it);
+        torPoint* trep2 = createLoop(it->intersect);
+        float t = isClockwise(trep);
+        float t2 = isClockwise(trep2);
+        if (t2 > 0 && t > 0) {
+            trep = t > t2 ? trep : trep2;
+        } else {
+            trep = t > 0 ? trep : trep2;
+        }
+        if (theOne == nullptr) {
+            theOne = trep;
+            cur = trep;
+        } else {
+            cur->intersect = trep;
+            cur = trep;
+        }
     }
 }
 
-void WallMaker::showFinal() {
-    for (auto& it : intersections) {
-        if (it == nullptr) continue;
-        showTorPoints(it);
+torPoint* WallMaker::createLoop(torPoint* tp) {
+    torPoint* tap = new torPoint();
+    tap->p = tp->p;
+    torPoint* start = tap;
+    torPoint* cur = tp;
+    while (true) {
+        cur = cur->next;
+        if (cur == tp || cur->intersect == tp) {
+            tap->next = start;
+            break;
+        }
+        tap->next = new torPoint();
+        tap = tap->next;
+        if (cur->intersect != nullptr) {
+            cur = cur->intersect;
+            for (auto& et : intersections) {
+                if (et == nullptr) continue;
+                if (et->p == cur->p) et = nullptr;
+            }
+        }
+        tap->p = cur->p;
     }
+    return start;
+}
+
+// if return value is <0, then the result is clockwise.
+float WallMaker::isClockwise(torPoint* tp) {
+    torPoint* tap = tp;
+    float sum = 0;
+    do {
+        sum += tap->p.x * tap->next->p.y - tap->next->p.x * tap->p.y;
+        tap = tap->next;
+    } while (tap != tp);
+    return sum;
+}
+
+void WallMaker::showFinal() {
+    torPoint* cur = theOne;
+    while (cur != nullptr) {
+        showTorPoints(cur);
+        cur = cur->intersect;
+    }
+}
+
+torPoint* WallMaker::getFinal() {
+    return theOne;
 }

@@ -1,4 +1,5 @@
 #include "types.h"
+#include "torPoint.h"
 #include <vector>
 
 #define DEBUG
@@ -18,18 +19,17 @@ public:
     void findCrossSection();
     void findFinal();
     void showFinal();
+
+    torPoint* getFinal();
 private:
-    struct torPoint {
-        torPoint* next = nullptr;
-        torPoint* intersect = nullptr;
-        FPoint p;
-    };
     FPoint** task;
     unsigned int num;
     unsigned int* ns;
     torPoint** IArray;
     torPoint** OArray;
     std::vector<torPoint*> intersections;
+    bool* isCol;
+    bool* isnCol;
 
     torPoint* createCrossSection(FPoint coord, torPoint* next = nullptr);
 
@@ -38,8 +38,18 @@ private:
     FPoint getIPoint(FPoint p1, FPoint p2, FPoint p3);
     FPoint getOPoint(FPoint p1, FPoint p2, FPoint p3);
     FPoint* isCollision(FPoint p1, FPoint p2, FPoint p3, FPoint p4);
+    bool isIntersect(FPoint p);
+    void checkValidInner();
+
+    bool arePointsSimilar(FPoint p1, FPoint p2);
 
     torPoint* skipInter(torPoint* tp);
+    torPoint* skipToInter(torPoint* tp);
+    float isClockwise(torPoint* tp);
+
+    torPoint* createLoop(torPoint* tp);
+
+    torPoint* theOne = nullptr;
 #ifdef DEBUG
     static void showTorPoints(torPoint* tp);
 #endif

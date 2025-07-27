@@ -1,8 +1,11 @@
 #include <stdio.h>
 #include "WallMaker.h"
+#include "GW_Sort.h"
 #include "Visualizer.h"
 
 int main() {
+    Visualizer v;
+    v.intitialize();
     WallMaker wm = WallMaker("./dots");
     unsigned int num = wm.getNum();
     /*
@@ -19,12 +22,11 @@ int main() {
         Visualizer v = Visualizer(wm.getOut(i), wm.getNs(i));
         v.show(false);
     } */
-    Visualizer v;
-    v.intitialize();
     wm.findCrossSection();
-    wm.showIn();
-    wm.showOut();
-    // wm.findFinal();
+    // wm.showIn();
+    // wm.showOut();
+    wm.findFinal();
     wm.showFinal();
+    GW_Sort::sort(wm.getFinal());
     return 0;
 }
