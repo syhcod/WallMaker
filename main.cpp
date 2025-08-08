@@ -26,7 +26,8 @@ int main() {
     // wm.showIn();
     // wm.showOut();
     wm.findFinal();
-    wm.showFinal();
+    // wm.showFinal();
     GW_Sort::sort(wm.getFinal());
+    GW_Sort::showTree();
     return 0;
 }

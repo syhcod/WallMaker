@@ -6,7 +6,7 @@ struct FPoint {
         x = 0.0;
         y = 0.0;
     }
-    FPoint(FPoint& f) {
+    FPoint(const FPoint& f) {
         x = f.x;
         y = f.y;
     }
