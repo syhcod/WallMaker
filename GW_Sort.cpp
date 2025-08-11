@@ -14,6 +14,7 @@ void printWalls(torPoint* one, torPoint* two) {
 
 void GW_Sort::sort(torPoint* walls) {
     root = transcribe(walls);
+    // RST(root);
     node* c = root->front;
     root->front = nullptr;
     recSort(c, root);
@@ -80,15 +81,17 @@ bool GW_Sort::isRight(FPoint a, FPoint b, FPoint c) {
 }
 
 void GW_Sort::recSort(node* walls, node* root) {
-    printNode(walls);
-    printNode(root);
+    // printNode(walls);
+    // printNode(root);
     if (walls == nullptr) return;
     FPoint rp1 = *(root->p1);
     FPoint rp2 = *(root->p2);
-    FPoint* inter = getInter(*(walls->p1), *(walls->p2), rp1, rp2);
-    FPoint mid = (rp1 + rp2) / 2.0f;
+    FPoint wp1 = *(walls->p1);
+    FPoint wp2 = *(walls->p2);
+    FPoint* inter = getInter(wp1, wp2, rp1, rp2);
+    FPoint mid = (wp1 + wp2) / 2.0f;
     if (inter == nullptr) {
-        bool right = isRight(*(walls->p1), *(walls->p2), mid);
+        bool right = isRight(*(root->p1), *(root->p2), mid);
         node* next = nullptr;
         if (right) next = root->front;
         else next = root->back;
@@ -100,20 +103,28 @@ void GW_Sort::recSort(node* walls, node* root) {
     else {
         node* a = new node();
         node* b = new node();
-        FPoint* st = root->p1, *ed = root->p2;
+        FPoint* st = walls->p1, *ed = walls->p2;
+        b->front = walls->front;
+        delete walls;
+        FPoint mid = (*st + *inter) / 2.0f;
         a->p1 = st;
         a->p2 = inter;
         b->p1 = inter;
         b->p2 = ed;
-        if (isRight(*(walls->p1), *(walls->p2), *(root->p1))) {
-            recSort(a, root->front);
-            recSort(b, root->back);
+        if (isRight(*(root->p1), *(root->p2), mid)) {
+            if (root->front == nullptr) root->front = a;
+            else recSort(a, root->front);
+            if (root->back == nullptr) recSort(b, root->back);
+            else recSort(b, root->back);
         } else {
-            recSort(a, root->back);
-            recSort(b, root->front);
+            if (root->back == nullptr) recSort(a, root->back);
+            else recSort(a, root->back);
+            if (root->front == nullptr) root->front = b;
+            else recSort(b, root->front);
         }
     }
     node* c = walls->front;
+    if (c == nullptr) return;
     walls->front = nullptr;
     recSort(c, GW_Sort::root);
 }
@@ -130,6 +141,10 @@ void GW_Sort::RST(node* n) {
 }
 
 void GW_Sort::printNode(node* n) {
+    if (n == nullptr) {
+        printf("NULL\n");
+        return;
+    }
     FPoint s = *(n->p1);
     FPoint e = *(n->p2);
     e = e - s;
@@ -161,14 +176,13 @@ FPoint* GW_Sort::getInter(FPoint p1, FPoint p2, FPoint p3, FPoint p4) {
     float t=((yi-b)*(xf-xi)-(xi-a)*(yf-yi))/det;
     float s=((yi-b)*(c-a)-(xi-a)*(d-b))/det;
     if (0<=s && s<=1) {
-        // printf("\tGOne\n");
         float x = xi + (xf - xi) * s;
         float y = yi + (yf - yi) * s;
 
         
-        // printf("\tWay Gone\n");
         fp = new FPoint(x,y);
-        if (isSim(p1, *fp) || isSim(p2, *fp)) return nullptr;
+        FPoint frap = *fp;
+        if (isSim(p1, frap) || isSim(p2, frap)) return nullptr;
         return fp;
     }
     return fp;
@@ -218,3 +232,69 @@ node* GW_Sort::transcribe(torPoint* Walls) {
     return root;
 }
 
+void RSN(node* r, int* n) {
+    if (r == nullptr) return;        
+    RSN(r->back, n);
+    r->num = *n;
+    (*n)++;
+    RSN(r->front, n);
+}
+
+void RSK(node* r, FPoint** v) {
+    if (r == nullptr) return;
+    RSK(r->back, v);
+    v[r->num] = r->p1;
+    RSK(r->front, v);
+}
+
+void RSK2(node* r, FPoint** v, int max) {
+    if (r == nullptr) return;
+    RSK2(r->back, v, max);
+    for (int i = 0; i < max; i++) {
+        if (v[i] == r->p2) {
+        r->e_num = i;
+        break;
+        }
+    }
+    RSK2(r->front, v, max);
+}
+
+void RSK3(node* r, FILE* f) {
+    if (r == nullptr) return;
+    RSK3(r->back, f); 
+    int b = 0, c = 0;
+    if (r->back != nullptr) b = r->back->num;
+    if (r->front != nullptr) c = r->front->num;
+    fprintf(f, "%d %d %d %d 600\n", r->num, r->e_num, b, c);
+    fprintf(f, "assets/Objects/Wall_texture/check.png assets/Objects/Wall_texture/grey_brick.jpg\n");
+    RSK3(r->front, f);
+}
+
+void GW_Sort::writeToFile() {
+    struct nrat{
+        node* n;
+        int num;
+    };
+    int nac = 0;
+    RSN(root, &nac);
+    FPoint** v = (FPoint**)malloc(sizeof(FPoint*) * nac);
+    RSK(root, v);
+    RSK2(root, v, nac);
+    FILE* fptr = fopen("wallFile.txt", "w"); // Open for writing
+    if (fptr == NULL) {
+        printf("Error opening file!\n");
+        // Handle the error, e.g., exit the program
+        // exit(1);
+    }
+    RSK3(root, fptr);
+
+    // Close the file
+    fclose(fptr);
+    fptr = fopen("dotsFile.txt", "w");
+    fprintf(fptr, "%d\n", nac);
+    for (int i = 0; i < nac; i++) {
+        double r = sqrt(pow((*v[i]).x, 2.0f) + pow((*v[i]).y, 2.0f));
+        double a = atan2((*v[i]).y, (*v[i]).x);
+        fprintf(fptr, "%lf %lf\n", r, a);
+    }
+}

@@ -15,6 +15,8 @@ struct node {
     node* back = nullptr;
     bool isGhost;
     bool notSet;
+    int num = 0;
+    int e_num = 0;
 };
 
 class GW_Sort {
@@ -22,6 +24,7 @@ public:
     static void sort(torPoint*);
     static node* root;
     static void showTree();
+    static void writeToFile();
 private:
     static torPoint* createWalls();
     static node* transcribe(torPoint*);

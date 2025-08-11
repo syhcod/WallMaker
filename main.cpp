@@ -26,8 +26,11 @@ int main() {
     // wm.showIn();
     // wm.showOut();
     wm.findFinal();
-    // wm.showFinal();
+    wm.showFinal();
+    // exit(1);
     GW_Sort::sort(wm.getFinal());
-    GW_Sort::showTree();
+    printf("Done\n");
+    // GW_Sort::showTree();
+    GW_Sort::writeToFile();
     return 0;
 }
